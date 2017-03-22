@@ -5,3 +5,4 @@ authors = ["onasauri <onasauri@gmail.com>"]
 
 [dependencies]
 sdl2 = "0.29"
+ndarray = "0.8"
