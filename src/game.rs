@@ -51,9 +51,9 @@ impl GameState {
         }
 
         // Place snake
-        tiles[(3, 3)] = Tile::Snake(Some((3, 4)));
-        tiles[(3, 4)] = Tile::Snake(Some((3, 5)));
-        tiles[(3, 5)] = Tile::Snake(None);
+        tiles[(3, 3)] = Tile::Snake(Direction::Right);
+        tiles[(3, 4)] = Tile::Snake(Direction::Right);
+        tiles[(3, 5)] = Tile::Snake(Direction::Right);
         let snake_head = (3, 5);
         let snake_tail = (3, 3);
         let snake_dir = Direction::Right;
@@ -90,14 +90,14 @@ impl GameState {
             }
             Tile::Floor => (), // No collision
         }
-        self.tiles[self.snake_head] = Tile::Snake(Some(new_snake_head));
-        self.tiles[new_snake_head] = Tile::Snake(None);
+        self.tiles[self.snake_head] = Tile::Snake(self.snake_dir);
+        self.tiles[new_snake_head] = Tile::Snake(self.snake_dir);
         self.snake_head = new_snake_head;
-        if let Tile::Snake(Some(new_snake_tail)) = self.tiles[self.snake_tail] {
+        if let Tile::Snake(snake_tail_dir) = self.tiles[self.snake_tail] {
             self.tiles[self.snake_tail] = Tile::Floor;
-            self.snake_tail = new_snake_tail;
+            self.snake_tail = self.snake_tail + snake_tail_dir;
         } else {
-            panic!("Expected Snake(Some(_)) on tile at position {:?}, found {:?} instead",
+            panic!("Expected Snake(_) on tile at position {:?}, found {:?} instead",
                    self.snake_tail,
                    self.tiles[self.snake_tail]);
         }
@@ -115,7 +115,7 @@ pub enum Tile {
     Floor,
     Wall,
     Food,
-    // A Snake tile contains the index of the next tile of the snake (pointing towards the
-    // head of the snake, which is the only Snake tile without an index)
-    Snake(Option<TileIndex>),
+    // A Snake tile contains the direction that part of the snake is moving in (pointing towards
+    // the head of the snake)
+    Snake(Direction),
 }
