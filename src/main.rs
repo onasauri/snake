@@ -1,15 +1,41 @@
+extern crate ndarray;
+extern crate sdl2;
+
 mod game {
-    extern crate ndarray;
+    use std::ops::Add;
+    use ndarray;
 
     type TileArray = ndarray::Array2<Tile>;
     // Index into a TileArray; arrays are indexed in (row (y), column (x)) order
     type TileIndex = (usize, usize);
 
+    impl Add<Direction> for TileIndex {
+        type Output = TileIndex;
+
+        fn add(self, direction: Direction) -> TileIndex {
+            let (y, x) = self;
+            match direction {
+                Direction::Up => (y - 1, x),
+                Direction::Down => (y + 1, x),
+                Direction::Left => (y, x - 1),
+                Direction::Right => (y, x + 1),
+            }
+        }
+    }
+
+    #[derive(Copy, Clone, Debug)]
+    pub enum Direction {
+        Up,
+        Down,
+        Left,
+        Right,
+    }
+
     pub struct GameState {
         tiles: TileArray,
         snake_head: TileIndex,
         snake_tail: TileIndex,
-        snake_dir: TileIndex,
+        snake_dir: Direction,
     }
 
     impl GameState {
@@ -34,7 +60,7 @@ mod game {
             tiles[(3, 5)] = Tile::Snake(None);
             let snake_head = (3, 5);
             let snake_tail = (3, 3);
-            let snake_dir = (0, 1);
+            let snake_dir = Direction::Right;
 
             GameState {
                 tiles: tiles,
@@ -48,28 +74,25 @@ mod game {
             &self.tiles
         }
 
+        pub fn set_snake_dir(&mut self, new_snake_dir: Direction) {
+            self.snake_dir = new_snake_dir;
+        }
+
         pub fn update(&mut self) {
             // Move snake
-            let new_snake_head = (self.snake_head.0 + self.snake_dir.0,
-                                  self.snake_head.1 + self.snake_dir.1);
-            // Handle out of bounds or collision
-            match self.tiles.get(new_snake_head) {
-                None => {
-                    // New head is out of bounds, so don't move
-                    // FIXME Shouldn't happen, so report error or something
-                    return;
-                }
-                Some(&Tile::Wall) |
-                Some(&Tile::Snake(_)) => {
+            let new_snake_head = self.snake_head + self.snake_dir;
+            // Handle collision
+            match self.tiles[new_snake_head] {
+                Tile::Wall | Tile::Snake(_) => {
                     // New head collides with wall or snake, so game over
                     // FIXME Implement game over, just return for now
                     return;
                 }
-                Some(&Tile::Food) => {
+                Tile::Food => {
                     // New head collides with food, so eat the food
                     // FIXME Spawn new food; adjust score
                 }
-                Some(&Tile::Floor) => (), // No collision
+                Tile::Floor => (), // No collision
             }
             self.tiles[self.snake_head] = Tile::Snake(Some(new_snake_head));
             self.tiles[new_snake_head] = Tile::Snake(None);
@@ -78,8 +101,9 @@ mod game {
                 self.tiles[self.snake_tail] = Tile::Floor;
                 self.snake_tail = new_snake_tail;
             } else {
-                // FIXME Shouldn't happen, so report error?
-                return;
+                panic!("Expected Snake(Some(_)) on tile at position {:?}, found {:?} instead",
+                       self.snake_tail,
+                       self.tiles[self.snake_tail]);
             }
         }
     }
@@ -96,9 +120,12 @@ mod game {
 }
 
 mod engine {
-    extern crate sdl2;
-
+    use sdl2;
+    use sdl2::event::Event;
+    use sdl2::keyboard::Keycode;
+    use sdl2::pixels::Color;
     use game;
+    use game::Direction;
 
     pub struct Engine {
         event_pump: sdl2::EventPump,
@@ -111,8 +138,20 @@ mod engine {
             loop {
                 for event in self.event_pump.poll_iter() {
                     match event {
-                        sdl2::event::Event::Quit { .. } |
-                        sdl2::event::Event::KeyDown { .. } => return Ok(()),
+                        Event::Quit { .. } |
+                        Event::KeyDown { keycode: Some(Keycode::Escape), .. } => return Ok(()),
+                        Event::KeyDown { keycode: Some(Keycode::Up), .. } => {
+                            self.game_state.set_snake_dir(Direction::Up)
+                        }
+                        Event::KeyDown { keycode: Some(Keycode::Down), .. } => {
+                            self.game_state.set_snake_dir(Direction::Down)
+                        }
+                        Event::KeyDown { keycode: Some(Keycode::Left), .. } => {
+                            self.game_state.set_snake_dir(Direction::Left)
+                        }
+                        Event::KeyDown { keycode: Some(Keycode::Right), .. } => {
+                            self.game_state.set_snake_dir(Direction::Right)
+                        }
                         _ => (),
                     }
                 }
@@ -122,15 +161,15 @@ mod engine {
         }
 
         fn render(&mut self) -> Result<(), String> {
-            self.renderer.set_draw_color(sdl2::pixels::Color::RGB(0, 0, 0));
+            self.renderer.set_draw_color(Color::RGB(0, 0, 0));
             self.renderer.clear();
             let scale: u32 = 8;
             for ((y, x), &tile) in self.game_state.tiles().indexed_iter() {
                 let color = match tile {
-                    game::Tile::Floor => sdl2::pixels::Color::RGB(0, 0, 255),
-                    game::Tile::Wall => sdl2::pixels::Color::RGB(255, 0, 0),
-                    game::Tile::Food => sdl2::pixels::Color::RGB(255, 255, 0),
-                    game::Tile::Snake(_) => sdl2::pixels::Color::RGB(0, 255, 0),
+                    game::Tile::Floor => Color::RGB(0, 0, 255),
+                    game::Tile::Wall => Color::RGB(255, 0, 0),
+                    game::Tile::Food => Color::RGB(255, 255, 0),
+                    game::Tile::Snake(_) => Color::RGB(0, 255, 0),
                 };
                 self.renderer.set_draw_color(color);
                 self.renderer
