@@ -1,5 +1,7 @@
 use std::ops::Add;
 use ndarray;
+use rand;
+use rand::Rng;
 
 type TileArray = ndarray::Array2<Tile>;
 // Index into a TileArray; arrays are indexed in (row (y), column (x)) order
@@ -19,7 +21,7 @@ impl Add<Direction> for TileIndex {
     }
 }
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub enum Direction {
     Up,
     Down,
@@ -58,12 +60,30 @@ impl GameState {
         let snake_tail = (3, 3);
         let snake_dir = Direction::Right;
 
-        Self {
+        let mut game_state = Self {
             tiles: tiles,
             snake_head: snake_head,
             snake_tail: snake_tail,
             snake_dir: snake_dir,
+        };
+        game_state.spawn_food();
+
+        game_state
+    }
+
+    fn spawn_food(&mut self) {
+        let (height, width) = self.tiles.dim();
+        let mut rng = rand::thread_rng();
+        let mut index = (0, 0);
+        // FIXME This will hang if the snake fills the entire playing field
+        loop {
+            index.0 = rng.gen_range(1, height - 1);
+            index.1 = rng.gen_range(1, width - 1);
+            if self.tiles[index] == Tile::Floor {
+                break;
+            };
         }
+        self.tiles[index] = Tile::Food;
     }
 
     pub fn tiles(&self) -> &TileArray {
@@ -77,6 +97,7 @@ impl GameState {
     pub fn update(&mut self) {
         // Move snake
         let new_snake_head = self.snake_head + self.snake_dir;
+        let mut eat_food = false;
         // Handle collision
         match self.tiles[new_snake_head] {
             Tile::Wall | Tile::Snake(_) => {
@@ -86,14 +107,17 @@ impl GameState {
             }
             Tile::Food => {
                 // New head collides with food, so eat the food
-                // FIXME Spawn new food; adjust score
+                eat_food = true;
             }
-            Tile::Floor => (), // No collision
+            Tile::Floor => {} // No collision
         }
         self.tiles[self.snake_head] = Tile::Snake(self.snake_dir);
         self.tiles[new_snake_head] = Tile::Snake(self.snake_dir);
         self.snake_head = new_snake_head;
-        if let Tile::Snake(snake_tail_dir) = self.tiles[self.snake_tail] {
+        if eat_food {
+            // FIXME Adjust score
+            self.spawn_food();
+        } else if let Tile::Snake(snake_tail_dir) = self.tiles[self.snake_tail] {
             self.tiles[self.snake_tail] = Tile::Floor;
             self.snake_tail = self.snake_tail + snake_tail_dir;
         } else {
@@ -110,7 +134,7 @@ impl Default for GameState {
     }
 }
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub enum Tile {
     Floor,
     Wall,
