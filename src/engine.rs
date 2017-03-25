@@ -13,6 +13,7 @@ pub struct Engine {
 
 impl Engine {
     pub fn run(&mut self) -> Result<(), String> {
+        let mut framecounter = 0;
         loop {
             for event in self.event_pump.poll_iter() {
                 match event {
@@ -33,8 +34,11 @@ impl Engine {
                     _ => (),
                 }
             }
-            self.game_state.update();
+            if framecounter % 10 == 0 {
+                self.game_state.update();
+            }
             self.render()?;
+            framecounter += 1;
         }
     }
 
