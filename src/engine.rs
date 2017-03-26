@@ -2,6 +2,7 @@ use sdl2;
 use sdl2::event::Event;
 use sdl2::keyboard::Keycode;
 use sdl2::pixels::Color;
+use sdl2::video::FullscreenType;
 use game;
 use game::Direction;
 
@@ -17,21 +18,31 @@ impl Engine {
         loop {
             for event in self.event_pump.poll_iter() {
                 match event {
-                    Event::Quit { .. } |
-                    Event::KeyDown { keycode: Some(Keycode::Escape), .. } => return Ok(()),
-                    Event::KeyDown { keycode: Some(Keycode::Up), .. } => {
-                        self.game_state.set_snake_dir(Direction::Up)
+                    Event::Quit { .. } => return Ok(()),
+                    Event::KeyDown { keycode: Some(keycode), repeat: false, .. } => {
+                        match keycode {
+                            Keycode::Escape => return Ok(()),
+                            Keycode::F => {
+                                {
+                                    let mut window = self.renderer.window_mut().unwrap();
+                                    let new_fullscreen_state = match window.fullscreen_state() {
+                                        FullscreenType::Off => FullscreenType::Desktop,
+                                        _ => FullscreenType::Off,
+                                    };
+                                    window.set_fullscreen(new_fullscreen_state)?;
+                                }
+                                self.renderer
+                                    .set_logical_size(640, 480)
+                                    .or_else(|e| Err(format!("{}", e)))?;
+                            }
+                            Keycode::Up => self.game_state.set_snake_dir(Direction::Up),
+                            Keycode::Down => self.game_state.set_snake_dir(Direction::Down),
+                            Keycode::Left => self.game_state.set_snake_dir(Direction::Left),
+                            Keycode::Right => self.game_state.set_snake_dir(Direction::Right),
+                            _ => {}
+                        }
                     }
-                    Event::KeyDown { keycode: Some(Keycode::Down), .. } => {
-                        self.game_state.set_snake_dir(Direction::Down)
-                    }
-                    Event::KeyDown { keycode: Some(Keycode::Left), .. } => {
-                        self.game_state.set_snake_dir(Direction::Left)
-                    }
-                    Event::KeyDown { keycode: Some(Keycode::Right), .. } => {
-                        self.game_state.set_snake_dir(Direction::Right)
-                    }
-                    _ => (),
+                    _ => {}
                 }
             }
             if framecounter % 10 == 0 {
