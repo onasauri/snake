@@ -74,11 +74,10 @@ impl GameState {
     fn spawn_food(&mut self) {
         let (height, width) = self.tiles.dim();
         let mut rng = rand::thread_rng();
-        let mut index = (0, 0);
+        let mut index;
         // FIXME This will hang if the snake fills the entire playing field
         loop {
-            index.0 = rng.gen_range(1, height - 1);
-            index.1 = rng.gen_range(1, width - 1);
+            index = (rng.gen_range(1, height - 1), rng.gen_range(1, width - 1));
             if self.tiles[index] == Tile::Floor {
                 break;
             };
@@ -90,11 +89,12 @@ impl GameState {
         &self.tiles
     }
 
-    pub fn set_snake_dir(&mut self, new_snake_dir: Direction) {
-        self.snake_dir = new_snake_dir;
-    }
+    pub fn update(&mut self, input: Option<Direction>) {
+        // Handle input
+        if let Some(new_snake_dir) = input {
+            self.snake_dir = new_snake_dir;
+        }
 
-    pub fn update(&mut self) {
         // Move snake
         let new_snake_head = self.snake_head + self.snake_dir;
         let mut eat_food = false;
@@ -102,7 +102,7 @@ impl GameState {
         match self.tiles[new_snake_head] {
             Tile::Wall | Tile::Snake(_) => {
                 // New head collides with wall or snake, so game over
-                // FIXME Implement game over, just return for now
+                // TODO Implement game over, just return for now
                 return;
             }
             Tile::Food => {
@@ -115,7 +115,8 @@ impl GameState {
         self.tiles[new_snake_head] = Tile::Snake(self.snake_dir);
         self.snake_head = new_snake_head;
         if eat_food {
-            // FIXME Adjust score
+            // TODO Adjust score
+            self.spawn_food();
             self.spawn_food();
         } else if let Tile::Snake(snake_tail_dir) = self.tiles[self.snake_tail] {
             self.tiles[self.snake_tail] = Tile::Floor;

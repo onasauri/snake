@@ -1,3 +1,4 @@
+use std::collections::VecDeque;
 use sdl2;
 use sdl2::event::Event;
 use sdl2::keyboard::Keycode;
@@ -15,6 +16,7 @@ pub struct Engine {
 impl Engine {
     pub fn run(&mut self) -> Result<(), String> {
         let mut framecounter = 0;
+        let mut inputs = VecDeque::new();
         loop {
             for event in self.event_pump.poll_iter() {
                 match event {
@@ -35,10 +37,10 @@ impl Engine {
                                     .set_logical_size(640, 480)
                                     .or_else(|e| Err(format!("{}", e)))?;
                             }
-                            Keycode::Up => self.game_state.set_snake_dir(Direction::Up),
-                            Keycode::Down => self.game_state.set_snake_dir(Direction::Down),
-                            Keycode::Left => self.game_state.set_snake_dir(Direction::Left),
-                            Keycode::Right => self.game_state.set_snake_dir(Direction::Right),
+                            Keycode::Up => inputs.push_back(Direction::Up),
+                            Keycode::Down => inputs.push_back(Direction::Down),
+                            Keycode::Left => inputs.push_back(Direction::Left),
+                            Keycode::Right => inputs.push_back(Direction::Right),
                             _ => {}
                         }
                     }
@@ -46,7 +48,7 @@ impl Engine {
                 }
             }
             if framecounter % 10 == 0 {
-                self.game_state.update();
+                self.game_state.update(inputs.pop_front());
             }
             self.render()?;
             framecounter += 1;
