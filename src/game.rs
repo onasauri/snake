@@ -29,10 +29,32 @@ pub enum Direction {
     Right,
 }
 
+impl Direction {
+    fn reverse(&self) -> Direction {
+        match *self {
+            Direction::Up => Direction::Down,
+            Direction::Down => Direction::Up,
+            Direction::Left => Direction::Right,
+            Direction::Right => Direction::Left,
+        }
+    }
+}
+
+#[derive(Copy, Clone, Debug, PartialEq)]
+pub enum Tile {
+    Floor,
+    Wall,
+    Food,
+    // Snake contains the optional directions towards the previous and next snake segments.  The
+    // tail has only a next direction (so a Snake(None, Some(_))) while the head has only a
+    // previous direction (so a Snake(Some(_), None)); all other segments have both defined.
+    Snake(Option<Direction>, Option<Direction>),
+}
+
 pub struct GameState {
     tiles: TileArray,
-    snake_head: TileIndex,
-    snake_tail: TileIndex,
+    snake_head_idx: TileIndex,
+    snake_tail_idx: TileIndex,
     snake_dir: Direction,
 }
 
@@ -53,17 +75,17 @@ impl GameState {
         }
 
         // Place snake
-        tiles[(3, 3)] = Tile::Snake(Direction::Right);
-        tiles[(3, 4)] = Tile::Snake(Direction::Right);
-        tiles[(3, 5)] = Tile::Snake(Direction::Right);
-        let snake_head = (3, 5);
-        let snake_tail = (3, 3);
+        tiles[(3, 3)] = Tile::Snake(None, Some(Direction::Right));
+        tiles[(3, 4)] = Tile::Snake(Some(Direction::Left), Some(Direction::Right));
+        tiles[(3, 5)] = Tile::Snake(Some(Direction::Left), None);
+        let snake_head_idx = (3, 5);
+        let snake_tail_idx = (3, 3);
         let snake_dir = Direction::Right;
 
         let mut game_state = Self {
             tiles: tiles,
-            snake_head: snake_head,
-            snake_tail: snake_tail,
+            snake_head_idx: snake_head_idx,
+            snake_tail_idx: snake_tail_idx,
             snake_dir: snake_dir,
         };
         game_state.spawn_food();
@@ -89,21 +111,43 @@ impl GameState {
         &self.tiles
     }
 
-    pub fn update(&mut self, input: Option<Direction>) {
+    fn get_snake_prev(&self, index: TileIndex) -> Result<Direction, String> {
+        if let Tile::Snake(Some(prev), _) = self.tiles[index] {
+            Ok(prev)
+        } else {
+            Err(format!("Expected Snake(Some(_), _) on tile at {:?}, but found {:?}",
+                        index,
+                        self.tiles[index]))
+        }
+    }
+
+    fn get_snake_next(&self, index: TileIndex) -> Result<Direction, String> {
+        if let Tile::Snake(_, Some(next)) = self.tiles[index] {
+            Ok(next)
+        } else {
+            Err(format!("Expected Snake(_, Some(_)) on tile at {:?}, but found {:?}",
+                        index,
+                        self.tiles[index]))
+        }
+    }
+
+    pub fn update(&mut self, input: Option<Direction>) -> Result<(), String> {
         // Handle input
         if let Some(new_snake_dir) = input {
             self.snake_dir = new_snake_dir;
         }
 
         // Move snake
-        let new_snake_head = self.snake_head + self.snake_dir;
+        let new_snake_head_idx = self.snake_head_idx + self.snake_dir;
+        let new_snake_tail_idx = self.snake_tail_idx + self.get_snake_next(self.snake_tail_idx)?;
         let mut eat_food = false;
         // Handle collision
-        match self.tiles[new_snake_head] {
-            Tile::Wall | Tile::Snake(_) => {
+        match self.tiles[new_snake_head_idx] {
+            Tile::Wall |
+            Tile::Snake(..) => {
                 // New head collides with wall or snake, so game over
                 // TODO Implement game over, just return for now
-                return;
+                return Ok(());
             }
             Tile::Food => {
                 // New head collides with food, so eat the food
@@ -111,21 +155,25 @@ impl GameState {
             }
             Tile::Floor => {} // No collision
         }
-        self.tiles[self.snake_head] = Tile::Snake(self.snake_dir);
-        self.tiles[new_snake_head] = Tile::Snake(self.snake_dir);
-        self.snake_head = new_snake_head;
+        // Move snake head
+        self.tiles[self.snake_head_idx] =
+            Tile::Snake(Some(self.get_snake_prev(self.snake_head_idx)?),
+                        Some(self.snake_dir));
+        self.tiles[new_snake_head_idx] = Tile::Snake(Some(self.snake_dir.reverse()), None);
+        self.snake_head_idx = new_snake_head_idx;
+        // Spawn new food or move snake tail
         if eat_food {
             // TODO Adjust score
             self.spawn_food();
             self.spawn_food();
-        } else if let Tile::Snake(snake_tail_dir) = self.tiles[self.snake_tail] {
-            self.tiles[self.snake_tail] = Tile::Floor;
-            self.snake_tail = self.snake_tail + snake_tail_dir;
         } else {
-            panic!("Expected Snake(_) on tile at position {:?}, found {:?} instead",
-                   self.snake_tail,
-                   self.tiles[self.snake_tail]);
+            self.tiles[self.snake_tail_idx] = Tile::Floor;
+            self.tiles[new_snake_tail_idx] =
+                Tile::Snake(None, Some(self.get_snake_next(new_snake_tail_idx)?));
+            self.snake_tail_idx = new_snake_tail_idx;
         }
+
+        Ok(())
     }
 }
 
@@ -133,14 +181,4 @@ impl Default for GameState {
     fn default() -> Self {
         Self::new()
     }
-}
-
-#[derive(Copy, Clone, Debug, PartialEq)]
-pub enum Tile {
-    Floor,
-    Wall,
-    Food,
-    // A Snake tile contains the direction that part of the snake is moving in (pointing towards
-    // the head of the snake)
-    Snake(Direction),
 }

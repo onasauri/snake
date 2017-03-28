@@ -3,9 +3,10 @@ use sdl2;
 use sdl2::event::Event;
 use sdl2::keyboard::Keycode;
 use sdl2::pixels::Color;
+use sdl2::rect::Rect;
 use sdl2::video::FullscreenType;
 use game;
-use game::Direction;
+use game::{Direction, Tile};
 
 pub struct Engine {
     event_pump: sdl2::EventPump,
@@ -48,7 +49,7 @@ impl Engine {
                 }
             }
             if framecounter % 10 == 0 {
-                self.game_state.update(inputs.pop_front());
+                self.game_state.update(inputs.pop_front())?;
             }
             self.render()?;
             framecounter += 1;
@@ -56,22 +57,56 @@ impl Engine {
     }
 
     fn render(&mut self) -> Result<(), String> {
-        self.renderer.set_draw_color(Color::RGB(0, 0, 0));
+        self.renderer.set_draw_color(Color::RGB(0, 0, 255));
         self.renderer.clear();
         let scale: u32 = 8;
         for ((y, x), &tile) in self.game_state.tiles().indexed_iter() {
             let color = match tile {
-                game::Tile::Floor => Color::RGB(0, 0, 255),
-                game::Tile::Wall => Color::RGB(255, 0, 0),
-                game::Tile::Food => Color::RGB(255, 255, 0),
-                game::Tile::Snake(_) => Color::RGB(0, 255, 0),
+                Tile::Floor => Color::RGB(0, 0, 255),
+                Tile::Wall => Color::RGB(255, 0, 0),
+                Tile::Food => Color::RGB(255, 255, 0),
+                Tile::Snake(..) => Color::RGB(0, 255, 0),
             };
             self.renderer.set_draw_color(color);
-            self.renderer
-                .fill_rect(sdl2::rect::Rect::new(x as i32 * scale as i32,
+            match tile {
+                Tile::Floor | Tile::Wall | Tile::Food => {
+                    self.renderer
+                        .fill_rect(Rect::new(x as i32 * scale as i32,
+                                             y as i32 * scale as i32,
+                                             scale,
+                                             scale))?;
+                }
+                Tile::Snake(from, to) => {
+                    if from == Some(Direction::Up) || to == Some(Direction::Up) {
+                        self.renderer
+                            .fill_rect(Rect::new(x as i32 * scale as i32 + 1,
                                                  y as i32 * scale as i32,
-                                                 scale,
-                                                 scale))?;
+                                                 scale - 2,
+                                                 scale - 1))?;
+                    }
+                    if from == Some(Direction::Down) || to == Some(Direction::Down) {
+                        self.renderer
+                            .fill_rect(Rect::new(x as i32 * scale as i32 + 1,
+                                                 y as i32 * scale as i32 + 1,
+                                                 scale - 2,
+                                                 scale - 1))?;
+                    }
+                    if from == Some(Direction::Left) || to == Some(Direction::Left) {
+                        self.renderer
+                            .fill_rect(Rect::new(x as i32 * scale as i32,
+                                                 y as i32 * scale as i32 + 1,
+                                                 scale - 1,
+                                                 scale - 2))?;
+                    }
+                    if from == Some(Direction::Right) || to == Some(Direction::Right) {
+                        self.renderer
+                            .fill_rect(Rect::new(x as i32 * scale as i32 + 1,
+                                                 y as i32 * scale as i32 + 1,
+                                                 scale - 1,
+                                                 scale - 2))?;
+                    }
+                }
+            }
         }
         self.renderer.present();
 
