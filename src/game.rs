@@ -56,6 +56,7 @@ pub struct GameState {
     snake_head_idx: TileIndex,
     snake_tail_idx: TileIndex,
     snake_dir: Direction,
+    snake_alive: bool,
 }
 
 impl GameState {
@@ -81,16 +82,22 @@ impl GameState {
         let snake_head_idx = (3, 5);
         let snake_tail_idx = (3, 3);
         let snake_dir = Direction::Right;
+        let snake_alive = true;
 
-        let mut game_state = Self {
+        let mut game_state = GameState {
             tiles: tiles,
             snake_head_idx: snake_head_idx,
             snake_tail_idx: snake_tail_idx,
             snake_dir: snake_dir,
+            snake_alive: snake_alive,
         };
         game_state.spawn_food();
 
         game_state
+    }
+
+    pub fn snake_alive(&self) -> bool {
+        self.snake_alive
     }
 
     fn spawn_food(&mut self) {
@@ -132,6 +139,11 @@ impl GameState {
     }
 
     pub fn update(&mut self, input: Option<Direction>) -> Result<(), String> {
+        // Don't do anything if the snake is dead
+        if !self.snake_alive {
+            return Ok(())
+        }
+
         // Handle input
         if let Some(new_snake_dir) = input {
             self.snake_dir = new_snake_dir;
@@ -146,7 +158,7 @@ impl GameState {
             Tile::Wall |
             Tile::Snake(..) => {
                 // New head collides with wall or snake, so game over
-                // TODO Implement game over, just return for now
+                self.snake_alive = false;
                 return Ok(());
             }
             Tile::Food => {

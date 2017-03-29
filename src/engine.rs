@@ -57,12 +57,17 @@ impl Engine {
     }
 
     fn render(&mut self) -> Result<(), String> {
-        self.renderer.set_draw_color(Color::RGB(0, 0, 255));
+        let floor_color = if self.game_state.snake_alive() {
+            Color::RGB(0, 0, 255)
+        } else {
+            Color::RGB(128, 0, 0)
+        };
+        self.renderer.set_draw_color(floor_color);
         self.renderer.clear();
         let scale: u32 = 8;
         for ((y, x), &tile) in self.game_state.tiles().indexed_iter() {
             let color = match tile {
-                Tile::Floor => Color::RGB(0, 0, 255),
+                Tile::Floor => floor_color,
                 Tile::Wall => Color::RGB(255, 0, 0),
                 Tile::Food => Color::RGB(255, 255, 0),
                 Tile::Snake(..) => Color::RGB(0, 255, 0),
