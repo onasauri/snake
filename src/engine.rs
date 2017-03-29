@@ -9,9 +9,10 @@ use game;
 use game::{Direction, Tile};
 
 pub struct Engine {
+    game_state: game::GameState,
+    tile_size: u32,
     event_pump: sdl2::EventPump,
     renderer: sdl2::render::Renderer<'static>,
-    game_state: game::GameState,
 }
 
 impl Engine {
@@ -34,8 +35,10 @@ impl Engine {
                                     };
                                     window.set_fullscreen(new_fullscreen_state)?;
                                 }
+                                let (level_width, level_height) = self.game_state.level_size();
                                 self.renderer
-                                    .set_logical_size(640, 480)
+                                    .set_logical_size(level_width as u32 * self.tile_size,
+                                                      level_height as u32 * self.tile_size)
                                     .or_else(|e| Err(format!("{}", e)))?;
                             }
                             Keycode::Up => inputs.push_back(Direction::Up),
@@ -57,62 +60,79 @@ impl Engine {
     }
 
     fn render(&mut self) -> Result<(), String> {
+        // Clear surface to black
+        self.renderer.set_draw_color(Color::RGB(0, 0, 0));
+        self.renderer.clear();
+
+        // Draw floor
         let floor_color = if self.game_state.snake_alive() {
             Color::RGB(0, 0, 255)
         } else {
             Color::RGB(128, 0, 0)
         };
         self.renderer.set_draw_color(floor_color);
-        self.renderer.clear();
-        let scale: u32 = 8;
+        let (level_width, level_height) = self.game_state.level_size();
+        self.renderer
+            .fill_rect(Rect::new(0,
+                                 0,
+                                 level_width as u32 * self.tile_size,
+                                 level_height as u32 * self.tile_size))?;
+
+        // Draw tiles other than floor
         for ((y, x), &tile) in self.game_state.tiles().indexed_iter() {
-            let color = match tile {
-                Tile::Floor => floor_color,
-                Tile::Wall => Color::RGB(255, 0, 0),
-                Tile::Food => Color::RGB(255, 255, 0),
-                Tile::Snake(..) => Color::RGB(0, 255, 0),
-            };
-            self.renderer.set_draw_color(color);
             match tile {
-                Tile::Floor | Tile::Wall | Tile::Food => {
+                Tile::Floor => {}
+                Tile::Wall => {
+                    self.renderer.set_draw_color(Color::RGB(255, 0, 0));
                     self.renderer
-                        .fill_rect(Rect::new(x as i32 * scale as i32,
-                                             y as i32 * scale as i32,
-                                             scale,
-                                             scale))?;
+                        .fill_rect(Rect::new(x as i32 * self.tile_size as i32,
+                                             y as i32 * self.tile_size as i32,
+                                             self.tile_size,
+                                             self.tile_size))?;
                 }
-                Tile::Snake(from, to) => {
-                    if from == Some(Direction::Up) || to == Some(Direction::Up) {
+                Tile::Food => {
+                    self.renderer.set_draw_color(Color::RGB(255, 255, 0));
+                    self.renderer
+                        .fill_rect(Rect::new(x as i32 * self.tile_size as i32 + 1,
+                                             y as i32 * self.tile_size as i32 + 1,
+                                             self.tile_size - 2,
+                                             self.tile_size - 2))?;
+                }
+                Tile::Snake(prev, next) => {
+                    self.renderer.set_draw_color(Color::RGB(0, 255, 0));
+                    if prev == Some(Direction::Up) || next == Some(Direction::Up) {
                         self.renderer
-                            .fill_rect(Rect::new(x as i32 * scale as i32 + 1,
-                                                 y as i32 * scale as i32,
-                                                 scale - 2,
-                                                 scale - 1))?;
+                            .fill_rect(Rect::new(x as i32 * self.tile_size as i32 + 1,
+                                                 y as i32 * self.tile_size as i32,
+                                                 self.tile_size - 2,
+                                                 self.tile_size - 1))?;
                     }
-                    if from == Some(Direction::Down) || to == Some(Direction::Down) {
+                    if prev == Some(Direction::Down) || next == Some(Direction::Down) {
                         self.renderer
-                            .fill_rect(Rect::new(x as i32 * scale as i32 + 1,
-                                                 y as i32 * scale as i32 + 1,
-                                                 scale - 2,
-                                                 scale - 1))?;
+                            .fill_rect(Rect::new(x as i32 * self.tile_size as i32 + 1,
+                                                 y as i32 * self.tile_size as i32 + 1,
+                                                 self.tile_size - 2,
+                                                 self.tile_size - 1))?;
                     }
-                    if from == Some(Direction::Left) || to == Some(Direction::Left) {
+                    if prev == Some(Direction::Left) || next == Some(Direction::Left) {
                         self.renderer
-                            .fill_rect(Rect::new(x as i32 * scale as i32,
-                                                 y as i32 * scale as i32 + 1,
-                                                 scale - 1,
-                                                 scale - 2))?;
+                            .fill_rect(Rect::new(x as i32 * self.tile_size as i32,
+                                                 y as i32 * self.tile_size as i32 + 1,
+                                                 self.tile_size - 1,
+                                                 self.tile_size - 2))?;
                     }
-                    if from == Some(Direction::Right) || to == Some(Direction::Right) {
+                    if prev == Some(Direction::Right) || next == Some(Direction::Right) {
                         self.renderer
-                            .fill_rect(Rect::new(x as i32 * scale as i32 + 1,
-                                                 y as i32 * scale as i32 + 1,
-                                                 scale - 1,
-                                                 scale - 2))?;
+                            .fill_rect(Rect::new(x as i32 * self.tile_size as i32 + 1,
+                                                 y as i32 * self.tile_size as i32 + 1,
+                                                 self.tile_size - 1,
+                                                 self.tile_size - 2))?;
                     }
                 }
             }
         }
+
+        // Present surface to screen
         self.renderer.present();
 
         Ok(())
@@ -120,21 +140,26 @@ impl Engine {
 }
 
 pub fn init() -> Result<Engine, String> {
+    let game_state = game::GameState::default();
+    let tile_size = 8;
     let sdl = sdl2::init()?;
     let video = sdl.video()?;
     let event_pump = sdl.event_pump()?;
-    let window = video.window("Snake", 640, 480)
+    let (level_width, level_height) = game_state.level_size();
+    let window = video.window("Snake",
+                              level_width as u32 * tile_size,
+                              level_height as u32 * tile_size)
         .build()
         .or_else(|e| Err(format!("{}", e)))?;
     let renderer = window.renderer()
         .present_vsync()
         .build()
         .or_else(|e| Err(format!("{}", e)))?;
-    let game_state = game::GameState::new();
 
     Ok(Engine {
+           game_state: game_state,
+           tile_size: tile_size,
            event_pump: event_pump,
            renderer: renderer,
-           game_state: game_state,
        })
 }

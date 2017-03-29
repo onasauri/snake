@@ -52,6 +52,8 @@ pub enum Tile {
 }
 
 pub struct GameState {
+    level_width: usize,
+    level_height: usize,
     tiles: TileArray,
     snake_head_idx: TileIndex,
     snake_tail_idx: TileIndex,
@@ -60,19 +62,17 @@ pub struct GameState {
 }
 
 impl GameState {
-    pub fn new() -> Self {
-        let width = 80;
-        let height = 50;
-        let mut tiles = ndarray::Array::from_elem((height, width), Tile::Floor);
+    pub fn new(level_width: usize, level_height: usize) -> Self {
+        let mut tiles = ndarray::Array::from_elem((level_height, level_width), Tile::Floor);
 
         // Build level wall
-        for x in 0..width {
+        for x in 0..level_width {
             tiles[(0, x)] = Tile::Wall;
-            tiles[(height - 1, x)] = Tile::Wall;
+            tiles[(level_height - 1, x)] = Tile::Wall;
         }
-        for y in 0..height {
+        for y in 0..level_height {
             tiles[(y, 0)] = Tile::Wall;
-            tiles[(y, width - 1)] = Tile::Wall;
+            tiles[(y, level_width - 1)] = Tile::Wall;
         }
 
         // Place snake
@@ -85,6 +85,8 @@ impl GameState {
         let snake_alive = true;
 
         let mut game_state = GameState {
+            level_width: level_width,
+            level_height: level_height,
             tiles: tiles,
             snake_head_idx: snake_head_idx,
             snake_tail_idx: snake_tail_idx,
@@ -96,17 +98,21 @@ impl GameState {
         game_state
     }
 
+    pub fn level_size(&self) -> (usize, usize) {
+        (self.level_width, self.level_height)
+    }
+
     pub fn snake_alive(&self) -> bool {
         self.snake_alive
     }
 
     fn spawn_food(&mut self) {
-        let (height, width) = self.tiles.dim();
         let mut rng = rand::thread_rng();
         let mut index;
         // FIXME This will hang if the snake fills the entire playing field
         loop {
-            index = (rng.gen_range(1, height - 1), rng.gen_range(1, width - 1));
+            index = (rng.gen_range(1, self.level_height - 1),
+                     rng.gen_range(1, self.level_width - 1));
             if self.tiles[index] == Tile::Floor {
                 break;
             };
@@ -141,7 +147,7 @@ impl GameState {
     pub fn update(&mut self, input: Option<Direction>) -> Result<(), String> {
         // Don't do anything if the snake is dead
         if !self.snake_alive {
-            return Ok(())
+            return Ok(());
         }
 
         // Handle input
@@ -155,8 +161,7 @@ impl GameState {
         let mut eat_food = false;
         // Handle collision
         match self.tiles[new_snake_head_idx] {
-            Tile::Wall |
-            Tile::Snake(..) => {
+            Tile::Wall | Tile::Snake(..) => {
                 // New head collides with wall or snake, so game over
                 self.snake_alive = false;
                 return Ok(());
@@ -191,6 +196,6 @@ impl GameState {
 
 impl Default for GameState {
     fn default() -> Self {
-        Self::new()
+        Self::new(40, 30)
     }
 }
