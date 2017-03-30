@@ -5,11 +5,12 @@ use sdl2::keyboard::Keycode;
 use sdl2::pixels::Color;
 use sdl2::rect::Rect;
 use sdl2::video::FullscreenType;
-use game;
-use game::{Direction, Tile};
+use preferences::Preferences;
+
+use game::{Direction, GameState, Tile};
 
 pub struct Engine {
-    game_state: game::GameState,
+    game_state: GameState,
     tile_size: u32,
     event_pump: sdl2::EventPump,
     renderer: sdl2::render::Renderer<'static>,
@@ -19,13 +20,13 @@ impl Engine {
     pub fn run(&mut self) -> Result<(), String> {
         let mut framecounter = 0;
         let mut inputs = VecDeque::new();
-        loop {
+        'mainloop: loop {
             for event in self.event_pump.poll_iter() {
                 match event {
-                    Event::Quit { .. } => return Ok(()),
+                    Event::Quit { .. } => break 'mainloop,
                     Event::KeyDown { keycode: Some(keycode), repeat: false, .. } => {
                         match keycode {
-                            Keycode::Escape => return Ok(()),
+                            Keycode::Escape => break 'mainloop,
                             Keycode::F => {
                                 {
                                     let mut window = self.renderer.window_mut().unwrap();
@@ -45,6 +46,11 @@ impl Engine {
                             Keycode::Down => inputs.push_back(Direction::Down),
                             Keycode::Left => inputs.push_back(Direction::Left),
                             Keycode::Right => inputs.push_back(Direction::Right),
+                            Keycode::Return => {
+                                if !self.game_state.snake_alive() {
+                                    self.game_state.reset();
+                                }
+                            }
                             _ => {}
                         }
                     }
@@ -57,6 +63,11 @@ impl Engine {
             self.render()?;
             framecounter += 1;
         }
+
+        // Save game state on exit
+        self.game_state.save(&::APP_INFO, "game_state").or_else(|e| Err(format!("{}", e)))?;
+
+        Ok(())
     }
 
     fn render(&mut self) -> Result<(), String> {
@@ -140,7 +151,7 @@ impl Engine {
 }
 
 pub fn init() -> Result<Engine, String> {
-    let game_state = game::GameState::default();
+    let game_state = GameState::load(&::APP_INFO, "game_state").unwrap_or_default();
     let tile_size = 8;
     let sdl = sdl2::init()?;
     let video = sdl.video()?;

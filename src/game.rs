@@ -21,7 +21,7 @@ impl Add<Direction> for TileIndex {
     }
 }
 
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Copy, Clone, Debug, PartialEq)]
 pub enum Direction {
     Up,
     Down,
@@ -40,7 +40,7 @@ impl Direction {
     }
 }
 
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Copy, Clone, Debug, PartialEq)]
 pub enum Tile {
     Floor,
     Wall,
@@ -51,6 +51,7 @@ pub enum Tile {
     Snake(Option<Direction>, Option<Direction>),
 }
 
+#[derive(Serialize, Deserialize)]
 pub struct GameState {
     level_width: usize,
     level_height: usize,
@@ -60,10 +61,11 @@ pub struct GameState {
     snake_dir: Direction,
     snake_alive: bool,
     score: u32,
+    highscore: u32,
 }
 
 impl GameState {
-    pub fn new(level_width: usize, level_height: usize) -> Self {
+    pub fn new(level_width: usize, level_height: usize, highscore: u32) -> Self {
         let mut tiles = ndarray::Array::from_elem((level_height, level_width), Tile::Floor);
 
         // Build level wall
@@ -95,10 +97,15 @@ impl GameState {
             snake_dir: snake_dir,
             snake_alive: snake_alive,
             score: score,
+            highscore: highscore,
         };
         game_state.spawn_food();
 
         game_state
+    }
+
+    pub fn reset(&mut self) {
+        *self = GameState::new(self.level_width, self.level_height, self.highscore);
     }
 
     pub fn level_size(&self) -> (usize, usize) {
@@ -162,13 +169,19 @@ impl GameState {
         let new_snake_head_idx = self.snake_head_idx + self.snake_dir;
         let new_snake_tail_idx = self.snake_tail_idx + self.get_snake_next(self.snake_tail_idx)?;
         let mut eat_food = false;
-        // Handle collision
+        // Check for collision
         match self.tiles[new_snake_head_idx] {
             Tile::Wall | Tile::Snake(..) => {
                 // New head collides with wall or snake, so game over
                 self.snake_alive = false;
                 println!("Game over!");
                 println!("Your score: {}", self.score);
+                if self.score > self.highscore {
+                    println!("*** New highscore! ***");
+                    self.highscore = self.score;
+                } else {
+                    println!("Highscore: {}", self.highscore);
+                }
                 return Ok(());
             }
             Tile::Food => {
@@ -200,6 +213,6 @@ impl GameState {
 
 impl Default for GameState {
     fn default() -> Self {
-        Self::new(40, 30)
+        Self::new(40, 30, 0)
     }
 }
