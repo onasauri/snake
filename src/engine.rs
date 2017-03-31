@@ -14,6 +14,7 @@ pub struct Engine {
     tile_size: u32,
     event_pump: sdl2::EventPump,
     renderer: sdl2::render::Renderer<'static>,
+    mouse: sdl2::mouse::MouseUtil,
 }
 
 impl Engine {
@@ -30,11 +31,18 @@ impl Engine {
                             Keycode::F => {
                                 {
                                     let mut window = self.renderer.window_mut().unwrap();
-                                    let new_fullscreen_state = match window.fullscreen_state() {
-                                        FullscreenType::Off => FullscreenType::Desktop,
-                                        _ => FullscreenType::Off,
+                                    match window.fullscreen_state() {
+                                        FullscreenType::Off => {
+                                            // Enter fullscreen; hide mouse
+                                            window.set_fullscreen(FullscreenType::Desktop)?;
+                                            self.mouse.show_cursor(false);
+                                        }
+                                        _ => {
+                                            // Leave fullscreen; show mouse
+                                            window.set_fullscreen(FullscreenType::Off)?;
+                                            self.mouse.show_cursor(true);
+                                        }
                                     };
-                                    window.set_fullscreen(new_fullscreen_state)?;
                                 }
                                 let (level_width, level_height) = self.game_state.level_size();
                                 self.renderer
@@ -169,11 +177,13 @@ pub fn init() -> Result<Engine, String> {
         .present_vsync()
         .build()
         .or_else(|e| Err(format!("{}", e)))?;
+    let mouse = sdl.mouse();
 
     Ok(Engine {
            game_state: game_state,
            tile_size: tile_size,
            event_pump: event_pump,
            renderer: renderer,
+           mouse: mouse,
        })
 }
