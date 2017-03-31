@@ -162,7 +162,10 @@ impl GameState {
 
         // Handle input
         if let Some(new_snake_dir) = input {
-            self.snake_dir = new_snake_dir;
+            // Reversing direction would instantly crash the snake into itself, so don't allow it
+            if new_snake_dir != self.snake_dir.reverse() {
+                self.snake_dir = new_snake_dir;
+            }
         }
 
         // Move snake
