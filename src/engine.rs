@@ -65,6 +65,9 @@ impl Engine {
         }
 
         // Save game state on exit
+        if !self.game_state.snake_alive() {
+            self.game_state.reset();
+        }
         self.game_state.save(&::APP_INFO, "game_state").or_else(|e| Err(format!("{}", e)))?;
 
         Ok(())
