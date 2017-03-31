@@ -1,4 +1,3 @@
-use std::ops::Add;
 use ndarray;
 use rand;
 use rand::Rng;
@@ -6,20 +5,6 @@ use rand::Rng;
 type TileArray = ndarray::Array2<Tile>;
 // Index into a TileArray; arrays are indexed in (row (y), column (x)) order
 type TileIndex = (usize, usize);
-
-impl Add<Direction> for TileIndex {
-    type Output = TileIndex;
-
-    fn add(self, direction: Direction) -> TileIndex {
-        let (y, x) = self;
-        match direction {
-            Direction::Up => (y - 1, x),
-            Direction::Down => (y + 1, x),
-            Direction::Left => (y, x - 1),
-            Direction::Right => (y, x + 1),
-        }
-    }
-}
 
 #[derive(Serialize, Deserialize, Copy, Clone, Debug, PartialEq)]
 pub enum Direction {
@@ -68,16 +53,6 @@ impl GameState {
     pub fn new(level_width: usize, level_height: usize, highscore: u32) -> Self {
         let mut tiles = ndarray::Array::from_elem((level_height, level_width), Tile::Floor);
 
-        // Build level wall
-        for x in 0..level_width {
-            tiles[(0, x)] = Tile::Wall;
-            tiles[(level_height - 1, x)] = Tile::Wall;
-        }
-        for y in 0..level_height {
-            tiles[(y, 0)] = Tile::Wall;
-            tiles[(y, level_width - 1)] = Tile::Wall;
-        }
-
         // Place snake
         tiles[(3, 3)] = Tile::Snake(None, Some(Direction::Right));
         tiles[(3, 4)] = Tile::Snake(Some(Direction::Left), Some(Direction::Right));
@@ -99,10 +74,34 @@ impl GameState {
             score: score,
             highscore: highscore,
         };
+        game_state.toggle_walls();
         game_state.spawn_food();
 
         game_state
     }
+
+    fn swap_tile(&mut self, i: TileIndex, tile1: Tile, tile2: Tile) {
+        let tile = self.tiles[i];
+        if tile == tile1 {
+            self.tiles[i] = tile2;
+        } else if tile == tile2 {
+            self.tiles[i] = tile1;
+        }
+    }
+
+    pub fn toggle_walls(&mut self) {
+        // Build level wall
+        let (w, h) = (self.level_width, self.level_height);
+        for x in 0..w {
+            self.swap_tile((0, x), Tile::Floor, Tile::Wall);
+            self.swap_tile((h - 1, x), Tile::Floor, Tile::Wall);
+        }
+        for y in 1..h - 1 {
+            self.swap_tile((y, 0), Tile::Floor, Tile::Wall);
+            self.swap_tile((y, w - 1), Tile::Floor, Tile::Wall);
+        }
+    }
+
 
     pub fn reset(&mut self) {
         *self = GameState::new(self.level_width, self.level_height, self.highscore);
@@ -121,8 +120,7 @@ impl GameState {
         let mut index;
         // FIXME This will hang if the snake fills the entire playing field
         loop {
-            index = (rng.gen_range(1, self.level_height - 1),
-                     rng.gen_range(1, self.level_width - 1));
+            index = (rng.gen_range(0, self.level_height), rng.gen_range(0, self.level_width));
             if self.tiles[index] == Tile::Floor {
                 break;
             };
@@ -154,6 +152,15 @@ impl GameState {
         }
     }
 
+    fn add_dir_to_index(&self, (y, x): TileIndex, dir: Direction) -> TileIndex {
+        match dir {
+            Direction::Up => ((y + self.level_height - 1) % self.level_height, x),
+            Direction::Down => ((y + 1) % self.level_height, x),
+            Direction::Left => (y, (x + self.level_width - 1) % self.level_width),
+            Direction::Right => (y, (x + 1) % self.level_width),
+        }
+    }
+
     pub fn update(&mut self, input: Option<Direction>) -> Result<(), String> {
         // Don't do anything if the snake is dead
         if !self.snake_alive {
@@ -169,8 +176,9 @@ impl GameState {
         }
 
         // Move snake
-        let new_snake_head_idx = self.snake_head_idx + self.snake_dir;
-        let new_snake_tail_idx = self.snake_tail_idx + self.get_snake_next(self.snake_tail_idx)?;
+        let new_snake_head_idx = self.add_dir_to_index(self.snake_head_idx, self.snake_dir);
+        let new_snake_tail_idx =
+            self.add_dir_to_index(self.snake_tail_idx, self.get_snake_next(self.snake_tail_idx)?);
         let mut eat_food = false;
         // Check for collision
         match self.tiles[new_snake_head_idx] {

@@ -31,24 +31,24 @@ impl Engine {
                             Keycode::F => {
                                 {
                                     let mut window = self.renderer.window_mut().unwrap();
-                                    match window.fullscreen_state() {
-                                        FullscreenType::Off => {
-                                            // Enter fullscreen; hide mouse
-                                            window.set_fullscreen(FullscreenType::Desktop)?;
-                                            self.mouse.show_cursor(false);
-                                        }
-                                        _ => {
-                                            // Leave fullscreen; show mouse
-                                            window.set_fullscreen(FullscreenType::Off)?;
-                                            self.mouse.show_cursor(true);
-                                        }
-                                    };
+                                    if window.fullscreen_state() == FullscreenType::Off {
+                                        // Enter fullscreen; hide mouse
+                                        window.set_fullscreen(FullscreenType::Desktop)?;
+                                        self.mouse.show_cursor(false);
+                                    } else {
+                                        // Leave fullscreen; show mouse
+                                        window.set_fullscreen(FullscreenType::Off)?;
+                                        self.mouse.show_cursor(true);
+                                    }
                                 }
                                 let (level_width, level_height) = self.game_state.level_size();
                                 self.renderer
                                     .set_logical_size(level_width as u32 * self.tile_size,
                                                       level_height as u32 * self.tile_size)
                                     .or_else(|e| Err(format!("{}", e)))?;
+                            }
+                            Keycode::W => {
+                                self.game_state.toggle_walls();
                             }
                             Keycode::Up => inputs.push_back(Direction::Up),
                             Keycode::Down => inputs.push_back(Direction::Down),
@@ -76,7 +76,9 @@ impl Engine {
         if !self.game_state.snake_alive() {
             self.game_state.reset();
         }
-        self.game_state.save(&::APP_INFO, "game_state").or_else(|e| Err(format!("{}", e)))?;
+        self.game_state
+            .save(&::APP_INFO, "game_state")
+            .or_else(|e| Err(format!("{}", e)))?;
 
         Ok(())
     }
