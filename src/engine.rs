@@ -25,7 +25,11 @@ impl Engine {
             for event in self.event_pump.poll_iter() {
                 match event {
                     Event::Quit { .. } => break 'mainloop,
-                    Event::KeyDown { keycode: Some(keycode), repeat: false, .. } => {
+                    Event::KeyDown {
+                        keycode: Some(keycode),
+                        repeat: false,
+                        ..
+                    } => {
                         match keycode {
                             Keycode::Escape => break 'mainloop,
                             Keycode::F => {
@@ -171,8 +175,8 @@ pub fn init() -> Result<Engine, String> {
     let event_pump = sdl.event_pump()?;
     let (level_width, level_height) = game_state.level_size();
     let window = video.window("Snake",
-                              level_width as u32 * tile_size,
-                              level_height as u32 * tile_size)
+                level_width as u32 * tile_size,
+                level_height as u32 * tile_size)
         .build()
         .or_else(|e| Err(format!("{}", e)))?;
     let renderer = window.renderer()

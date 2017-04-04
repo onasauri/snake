@@ -178,7 +178,8 @@ impl GameState {
         // Move snake
         let new_snake_head_idx = self.add_dir_to_index(self.snake_head_idx, self.snake_dir);
         let new_snake_tail_idx =
-            self.add_dir_to_index(self.snake_tail_idx, self.get_snake_next(self.snake_tail_idx)?);
+            self.add_dir_to_index(self.snake_tail_idx,
+                                  self.get_snake_next(self.snake_tail_idx)?);
         let mut eat_food = false;
         // Check for collision
         match self.tiles[new_snake_head_idx] {

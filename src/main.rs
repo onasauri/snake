@@ -10,7 +10,10 @@ use preferences::AppInfo;
 pub mod engine;
 pub mod game;
 
-const APP_INFO: AppInfo = AppInfo { name: "snake", author: "onasauri" };
+const APP_INFO: AppInfo = AppInfo {
+    name: "snake",
+    author: "onasauri",
+};
 
 fn main() {
     match engine::init() {
